@@ -1,0 +1,13 @@
+target
+*.swp
+*.sublime-project
+*.sublime-workspace
+converted.html
+converted.pdf
+/output
+/public
+.idea
+.firebase/
+firebase-debug.log
+
+authors.json

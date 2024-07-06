@@ -101,7 +101,7 @@ def varying_timesteps(Jhat, ebs, lam, time_step_vector, final_time):
     return plt
 
 
-# print(time_eval(entagl(0.0, 0.1, 0.1), 1))
+print(time_eval(entagl(0.0, 0.1, 0.1), 1))
 
 # varying_Jhat([0.0, 1.0], 0.0, 0.0, 0.2, 10)
 

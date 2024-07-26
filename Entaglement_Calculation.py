@@ -3,8 +3,7 @@ from scipy.linalg import expm
 import matplotlib.pyplot as plt
 
 
-def entagl(Jhat, ebs, lam):
-    n = 150
+def entagl(Jhat, ebs, lam, n):
     Z = np.zeros((n, n))
     O = np.eye(n)
     k = ebs * O
@@ -37,11 +36,9 @@ def entagl(Jhat, ebs, lam):
     return Htotal
 
 
-def time_eval(Htotal, time):
-    n = 150
-    initial_state = (1 / np.sqrt(2)) * np.zeros((4 * n, 1))
-    initial_state[151] = 1 / np.sqrt(2)
-    initial_state[301] = -1 / np.sqrt(2)
+def time_eval(Htotal, time, n):
+    initial_state = np.zeros((4 * n, 1))
+    initial_state[0] = 1
 
     time_evolution_operator = expm(-1j * Htotal * time)
 
@@ -58,16 +55,16 @@ def time_eval(Htotal, time):
     return round(value.item(), 5)
 
 
-def varying_Jhat(Jhat_vector, ebs, lam, time_step, final_time):
+def varying_Jhat(Jhat_vector, ebs, lam, time_step, final_time, n):
     for Jhat in Jhat_vector:
-        H_total = entagl(Jhat, ebs, lam)
+        H_total = entagl(Jhat, ebs, lam, n)
         val_vector = []
         time_vector = []
 
         for t in range(0, int(final_time / time_step) + 1):
             current_time = t * time_step
             time_vector.append(current_time)
-            value = time_eval(H_total, current_time)
+            value = time_eval(H_total, current_time, n)
             val_vector.append(value)
 
         plt.plot(time_vector, val_vector, label=f'Jhat={Jhat}')
@@ -80,8 +77,8 @@ def varying_Jhat(Jhat_vector, ebs, lam, time_step, final_time):
     return plt
 
 
-def varying_timesteps(Jhat, ebs, lam, time_step_vector, final_time):
-    Htotal = entagl(Jhat, ebs, lam)
+def varying_timesteps(Jhat, ebs, lam, time_step_vector, final_time, n):
+    Htotal = entagl(Jhat, ebs, lam, n)
 
     for time_step in time_step_vector:
         val_vector = []
@@ -89,8 +86,9 @@ def varying_timesteps(Jhat, ebs, lam, time_step_vector, final_time):
         for t in range(0, int(final_time / time_step) + 1):
             current_time = t * time_step
             time_vector.append(current_time)
-            val = time_eval(Htotal, current_time)
+            val = time_eval(Htotal, current_time, n)
             val_vector.append(val)
+
         plt.plot(time_vector, val_vector, label=f'time_step = {time_step}')
 
     plt.xlabel('Time')
@@ -101,14 +99,40 @@ def varying_timesteps(Jhat, ebs, lam, time_step_vector, final_time):
     return plt
 
 
-print(time_eval(entagl(0.0, 0.1, 0.1), 1))
+def varying_n_value(Jhat, ebs, lam, n_vector, time_step, final_time):
 
-# varying_Jhat([0.0, 1.0], 0.0, 0.0, 0.2, 10)
+    for n in n_vector:
+        Htotal = entagl(Jhat, ebs, lam, n)
+        val_vector = []
+        time_vector = []
 
-# varying_timesteps(0.0, 1.0, 1.0, [0.1], 1)
+        for t in range(0, int(final_time / time_step) + 1):
+            current_time = t * time_step
+            time_vector.append(current_time)
+            val = time_eval(Htotal, current_time, n)
+            val_vector.append(val)
 
-# Ht, Hs, Hb, Hsb = entagl(0.0, 0.0, 0.0)
+        plt.plot(time_vector, val_vector, label=f'n_value = {n}')
+
+    plt.xlabel('Time')
+    plt.ylabel('Inner product value')
+    plt.title('Inner Product varying with time')
+    plt.legend()
+    plt.show()
+    return plt
+
+
+# print(time_eval(entagl(2, 0, 0), 1, 150))
+
+# varying_Jhat([1.0], 1.3, 1.1, 0.01, 3, 150)
+
+varying_timesteps(1, 1, 1.5, [0.1, 0.7, 1.0], 50, 150)
+
+# Ht, Hs, Hb, Hsb = entagl(0.0, 0.0, 0.0, 150)
 
 # time_eval(Ht, 10)
+
+# varying_n_value(1, 1, 1.5, [50, 150], 0.05, 10)
+
 # my code
 

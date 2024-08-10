@@ -1,6 +1,6 @@
-import numpy as np
-from scipy.linalg import expm
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.linalg import expm, logm
 
 
 def entagl(Jhat, ebs, lam, n):
@@ -195,32 +195,83 @@ def time_evolution_of_trace(Htotal, time_step, end_time, n):
 def time_evolution_of_eigen_values(Htotal, time_step, end_time, n):
     eigen_values = []
     time_vector = []
+    zero_crossings_positive = []
+    zero_crossings_negative = []
+
     for t in range(0, int(end_time / time_step)):
         current_time = t * time_step
         time_vector.append(current_time)
         Arr = partial_transpose_of_reduced_density_matrix(
             reduced_density_matrix_of_system(density_matrix(Htotal, current_time, n), n))
-        eigen_value = min(np.linalg.eigvals(Arr))
+        eigen_value = min(np.real(np.linalg.eigvals(Arr)))
         # print(eigen_value)
         if eigen_value > 0:
+            # print(eigen_value)
             eigen_value = 0
-        eigen_values.append(eigen_value)
+        eigen_values.append(np.round(eigen_value, 5))
+
+    # print(eigen_values)
+    for i in range(1, len(eigen_values)):
+        if eigen_values[i - 1] < 0 and eigen_values[i] >= 0:
+            zero_crossings_positive.append((time_vector[i], eigen_values[i]))
+        if eigen_values[i - 1] >= 0 and eigen_values[i] < 0:
+            zero_crossings_negative.append((time_vector[i - 1], eigen_values[i - 1]))
 
     # for value in eigen_values:
     #     plt.scatter(time_vector, value)
+
     plt.scatter(time_vector, eigen_values)
     plt.xlabel('Time')
     plt.ylabel('Minimum Eigen Value')
     plt.title('Minimum Eigen Value varying with time')
+
+    for point in zero_crossings_negative:
+        plt.scatter(point[0], point[1], color='g')
+        plt.annotate(f'({point[0]:.2f}, {point[1]:.2f})', (point[0], point[1]), textcoords="offset points",
+                     xytext=(10, -10), ha='center')
+    for point in zero_crossings_positive:
+        plt.scatter(point[0], point[1], color='r')
+        plt.annotate(f'({point[0]:.2f}, {point[1]:.2f})', (point[0], point[1]), textcoords="offset points",
+                     xytext=(10, -10), ha='center')
+
     # plt.legend()
     plt.show()
 
 
-time_evolution_of_eigen_values(entagl(1, 0, 0.8, 150), 0.1, 20, 150)
+def reduced_density_matrix_over_1_qubit(rd_matrix):
+    prd_matrix = np.zeros((2, 2), dtype=complex)
+    prd_matrix[0][0] = rd_matrix[0][0] + rd_matrix[1][1]
+    prd_matrix[0][1] = rd_matrix[0][2] + rd_matrix[1][3]
+    prd_matrix[1][0] = rd_matrix[2][0] + rd_matrix[3][1]
+    prd_matrix[1][1] = rd_matrix[2][2] + rd_matrix[3][3]
 
+    return prd_matrix
+
+
+def varying_trace_of_entropy_with_time(Htotal, time_step, end_time, n):
+
+    trace_of_entropy_matrix = []
+    time_vector = []
+    for t in range(0, int(end_time / time_step) + 1):
+        current_time = t * time_step
+        time_vector.append(current_time)
+        matrix = reduced_density_matrix_over_1_qubit(reduced_density_matrix_of_system(density_matrix(Htotal, current_time, n), n))
+        new_matrix = -matrix @ logm(matrix)
+        val = np.trace(new_matrix)
+        trace_of_entropy_matrix.append(np.round(abs(val), 5))
+
+    plt.plot(time_vector, trace_of_entropy_matrix)
+    plt.xlabel('Time')
+    plt.ylabel('Trace of the entropy matrix')
+    plt.show()
+
+
+# varying_trace_of_entropy_with_time(entagl(1, 0, 1, 150), 0.2, 2, 150)
+# time_evolution_of_eigen_values(entagl(1, 0, 2.0, 150), 0.1, 20, 150)
+# #
 # red_matr = reduced_density_matrix_of_system(density_matrix(entagl(1, 1, 0, 150), 10, 150), 150)
 # print(red_matr)
-
+# #
 # Arr = partial_transpose_of_reduced_density_matrix(red_matr)
 # print(Arr)
 # print(min(np.linalg.eigvals(Arr)))

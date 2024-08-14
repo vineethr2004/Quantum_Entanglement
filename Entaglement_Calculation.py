@@ -38,8 +38,8 @@ def entagl(Jhat, ebs, lam, n):
 
 def time_eval(Htotal, time, n):
     initial_state = np.zeros((4 * n, 1))
-    initial_state[150] = 1 / np.sqrt(2)
-    initial_state[300] = 1 / np.sqrt(2)
+    initial_state[150] = 1
+    initial_state[300] = 0
 
     time_evolution_operator = expm(-1j * Htotal * time)
 
@@ -124,8 +124,8 @@ def varying_n_value(Jhat, ebs, lam, n_vector, time_step, final_time):
 
 def density_matrix(Htotal, time, n):
     initial_state = np.zeros((4 * n, 1))
-    initial_state[150] = 1 / np.sqrt(2)
-    initial_state[300] = 1 / np.sqrt(2)
+    initial_state[150] = 1
+    # initial_state[300] = 1 / np.sqrt(2)
 
     time_evolution_operator = expm(-1j * Htotal * time)
     state_at_time_t = time_evolution_operator @ initial_state
@@ -266,7 +266,7 @@ def varying_trace_of_entropy_with_time(Htotal, time_step, end_time, n):
     plt.show()
 
 
-# varying_trace_of_entropy_with_time(entagl(1, 0, 1, 150), 0.2, 2, 150)
+# varying_trace_of_entropy_with_time(entagl(1, 0, 2, 150), 0.2, 1, 150)
 # time_evolution_of_eigen_values(entagl(1, 0, 2.0, 150), 0.1, 20, 150)
 # #
 # red_matr = reduced_density_matrix_of_system(density_matrix(entagl(1, 1, 0, 150), 10, 150), 150)

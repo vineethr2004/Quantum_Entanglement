@@ -1,11 +1,11 @@
-
+from concurrent.futures import ProcessPoolExecutor
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import logm
 from matplotlib.lines import Line2D
 import os
 
-n = 30
+n = 25
 
 Initial_state = np.zeros((4 * n, 1), dtype=complex)
 Initial_state[n] = 1
@@ -27,7 +27,7 @@ def entagl(Jhat, ebs, lam):
     Hb = np.zeros((n, n))
 
     for i in range(0, n):
-        Hb[i][i] = 100 * 0.01 * (2 * (i + 1) - 1) / 2
+        Hb[i][i] = 1 * (2 * (i + 1) - 1) / 2
 
     Hbath = np.block([[Hb, Z, Z, Z],
                       [Z, Hb, Z, Z],
@@ -50,18 +50,20 @@ def entagl(Jhat, ebs, lam):
     Htotal = Hsystem + Hbath + Hsystem_and_bath
 
     eigen_values, eigen_vectors = np.linalg.eig(Htotal)
-
     return eigen_values, gram_schmidt_columns(eigen_vectors)
 
 
 def coeff_of_eigen_vectors(eigen_values, eigen_vectors, time):
     coeffs = np.zeros((4 * n, 1), dtype=complex)
+
     # print(f"shape of eigen values: {eigen_values.shape}")
     # print(f"shape of eigen vectors: {eigen_vectors.shape}")
+
     for i in range(0, 4 * n):
         initial_coeff = np.dot(np.conj(eigen_vectors[:, i]), Initial_state)
-        # print(f"Shape of initial_coeff: {initial_coeff.shape}")
-        # print(f"Shape of eigen_values[i]: {eigen_values[i].shape}")
+        # print(np.dot(eigen_vectors[:, 0], eigen_vectors[:, i]))
+        # print(np.linalg.norm(eigen_vectors[:, i]))
+        # print(eigen_values[i])
         coeffs[i] = initial_coeff * np.exp(-1j * eigen_values[i] * time)
 
     return coeffs
@@ -78,6 +80,7 @@ def psi_t(eigen_vectors, coeffs_t):
 
 def density_matrix_construction_at_time_t(psi_at_time_t):
     d_matrix_at_time_t = psi_at_time_t @ np.conj(np.transpose(psi_at_time_t))
+    # print(np.trace(d_matrix_at_time_t))
     return d_matrix_at_time_t
 
 
@@ -116,12 +119,11 @@ def partial_trace_over_bath_at_time_t(d_matrix_at_time_t):
 
     projections.append(p4)
 
-    # d_matrix_initial_basis = np.transpose(np.conj(eigen_vectors)) @ d_matrix_at_time_t @ eigen_vectors
-
     for i in range(0, 4):
         for j in range(0, 4):
             pt_rd[i][j] = np.trace(projections[i] @ d_matrix_at_time_t @ projections[j])
 
+    # print(np.trace(pt_rd))
     return pt_rd
 
 
@@ -151,9 +153,10 @@ def varying_trace_of_entropy_with_time(eigen_values, eigen_vectors, time_step, e
         d_matrix_cal = density_matrix_construction_at_time_t(psi_at_time_t)
 
         rd_matrix_bath = partial_trace_over_bath_at_time_t(d_matrix_cal)
+        # print(np.abs(np.trace(rd_matrix_bath @ rd_matrix_bath)))
 
         prd_matrix_qubit_one = reduced_density_matrix_over_1_qubit(rd_matrix_bath)
-
+        print(np.trace(np.abs(prd_matrix_qubit_one @ prd_matrix_qubit_one)))
         new_matrix = -prd_matrix_qubit_one @ logm(prd_matrix_qubit_one)
         val = np.trace(new_matrix)
 
@@ -163,7 +166,7 @@ def varying_trace_of_entropy_with_time(eigen_values, eigen_vectors, time_step, e
     plt.xlabel('Time')
     plt.ylabel('Trace of the entropy matrix')
     plt.ylim([0, 1])
-    # plt.show()
+    plt.show()
 
     return trace_of_entropy_matrix
 
@@ -253,41 +256,18 @@ def varying_lam_values(J, ebs, lam_vector, time_step, end_time):
     return np.array(trace_matrix), time_step
 
 
-def freq_domain(trace_matrix, time_step, padding_factor=15):
-    legend_handles = []
+eigenvalues, eigenvectors = entagl(0, 0, 1.0)
 
-    plt.figure()
+coeffs_at_t = coeff_of_eigen_vectors(eigenvalues, eigenvectors, 0.0)
 
-    for vec in trace_matrix:
-        # Zero-padding by appending zeros at the end of the signal
-        padded_length = padding_factor * len(vec)
-        padded_vec = np.zeros(padded_length, dtype=complex)
-        padded_vec[:len(vec)] = vec
-
-        # FFT with zero-padding
-        fft_vec = np.fft.fft(padded_vec)
-        frequencies = np.fft.fftfreq(len(padded_vec), time_step)
-        mag_fft_vec = np.abs(fft_vec)
-
-        # Plot the magnitude of the FFT
-        line, = plt.plot(frequencies, mag_fft_vec)
-        legend_handles.append(Line2D([0], [0], color=line.get_color(), lw=3))
-
-    plt.xlim([0, 0.3])  # Adjust the x-axis limit as needed
-    plt.legend(handles=legend_handles, loc='upper left', frameon=False, handlelength=3, handletextpad=1,
-               labelspacing=1.5)
-    plt.savefig(r'D:\Physics\Graphs\varying Entropy\initial_state_not_entangled\fft.png')
-    plt.grid(True)
-    plt.show()
-
-
-# eigenvalues, eigenvectors = entagl(0, 1, 0.75)
-
-# coeffs_at_t = coeff_of_eigen_vectors(eigenvalues, eigenvectors, 0)
-# print(coeffs_at_t)
-
+# for i in range(1, 100):
+#     print(eigenvalues[i], coeffs_at_t[i])
+#
 # psit = psi_t(eigenvectors, coeffs_at_t)
-# print(np.round(psit, 5))
+
+# for i in range(0, 400):
+#     if np.round(abs(psit[i]) ** 2, 4) > 0:
+#         print(i, abs(psit[i]) ** 2)
 
 # dmatrix = density_matrix_construction_at_time_t(psit)
 # print(np.round(dmatrix, 5))
@@ -298,16 +278,19 @@ def freq_domain(trace_matrix, time_step, padding_factor=15):
 # prd_matrix = reduced_density_matrix_over_1_qubit(rdmatrix)
 # print(prd_matrix)
 
-# varying_trace_of_entropy_with_time(eigenvalues, eigenvectors, 0.2, 20)
+varying_trace_of_entropy_with_time(eigenvalues, eigenvectors, 2, 10)
 
 # mat, st = varying_e_values(0, [0.0], 1.0, 0.2, 13)
 # mat, st = varying_e_values(0, [0.0], 0.3, 0.2, 60)
 
-mat, st = varying_lam_values(0.0, 0.0, [0.1], 1, 300)
+# varying_trace_of_entropy_with_time(eigenvalues, eigenvectors, 1, 20)
+# mat, st = varying_lam_values(0.0, 0.0, [0.1], 1, 100)
 # mat, st = varying_lam_values(0.0, 0.0, [0.03], 0.1, 10)
-folder_path = r"D:\Physics\Graphs\varying Entropy\initial_state_not_entangled\convergence"
-file_path = os.path.join(folder_path, 'mat100.npy')
-np.save(file_path, mat)
+
+# folder_path = r"D:\Physics\Graphs\varying Entropy\initial_state_not_entangled\convergence"
+# mat, st = varying_lam_values_parallel(0.0, 0.0, [0.19, 0.51], 2, 180, folder_path)
+# file_path = os.path.join(folder_path, 'mat100.npy')
+# np.save(file_path, mat)
 
 # mat, st = varying_lam_values(0, 0.0, [0.2, 0.3, 0.4], 0.2, 6)
 # freq_domain(mat, st)

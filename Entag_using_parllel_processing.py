@@ -6,9 +6,10 @@ from matplotlib.lines import Line2D
 import os
 
 n = 20
-n_sq = np.square(n)
-Initial_state = np.zeros((4 * n_sq, 1), dtype=complex)
-Initial_state[n_sq] = 1
+
+Initial_state = np.zeros((4 * n, 1), dtype=complex)
+Initial_state[n] = 1
+Initial_state[2 * n] = 0
 
 
 def gram_schmidt_columns(X):
@@ -16,39 +17,22 @@ def gram_schmidt_columns(X):
     return Q
 
 
-def entagl(Jhat, ebs, lam1, lam2, omega_1, omega_2):
-    Z_sq = np.zeros((n_sq, n_sq))
-    I_sq = np.eye(n_sq)
+def entagl(Jhat, ebs, lam):
     Z = np.zeros((n, n))
-    I = np.eye(n)
+    O = np.eye(n)
+    k = ebs * O
+    J = Jhat * O
 
-    k = ebs * I_sq
-    J = Jhat * I_sq
+    Hsystem = np.block([[2 * k, Z, Z, J], [Z, k, J, Z], [Z, J, k, Z], [J, Z, Z, Z]])
+    Hb = np.zeros((n, n))
 
-    Hsystem = np.block([[2 * k, Z_sq, Z_sq, J], [Z_sq, k, J, Z_sq], [Z_sq, J, k, Z_sq], [J, Z_sq, Z_sq, Z_sq]])
+    for i in range(0, n):
+        Hb[i][i] = 100 * 0.0009 * (2 * (i + 1) - 1) / 2
 
-    Hb_1 = np.zeros((4 * n_sq, 4 * n_sq))
-
-    it = 0
-
-    for r in range(0, 4):
-        for i in range(0, n):
-            val = omega_1 * (2 * i + 1) / 2
-            for t in range(0, n):
-                Hb_1[it][it] = val
-                it = it + 1
-
-    it = 0
-
-    Hb_2 = np.zeros((4 * n_sq, 4 * n_sq))
-
-    for r in range(0, 4):
-        for t in range(0, n):
-            for i in range(0, n):
-                Hb_2[it][it] = omega_2 * (2 * i + 1) / 2
-                it = it + 1
-
-    Hbath = Hb_1 + Hb_2
+    Hbath = np.block([[Hb, Z, Z, Z],
+                      [Z, Hb, Z, Z],
+                      [Z, Z, Hb, Z],
+                      [Z, Z, Z, Hb]])
 
     x = np.zeros((n, n))
 
@@ -56,23 +40,10 @@ def entagl(Jhat, ebs, lam1, lam2, omega_1, omega_2):
         x[i - 1][i] = np.sqrt(i)
         x[i][i - 1] = np.sqrt(i)
 
-    Y_1 = np.kron(x, I)
-
-    # Using lam1 for Hsb_1 (interaction with bath 1)
-    Hsb_1 = lam1 * np.block([[Z_sq, Y_1, Y_1, Z_sq],
-                            [Y_1, Z_sq, Z_sq, Y_1],
-                            [Y_1, Z_sq, Z_sq, Y_1],
-                            [Z_sq, Y_1, Y_1, Z_sq]])
-
-    Y_2 = np.kron(I, x)
-
-    # Using lam2 for Hsb_2 (interaction with bath 2)
-    Hsb_2 = lam2 * np.block([[Y_2, Z_sq, Z_sq, Y_2],
-                           [Z_sq, Y_2, Y_2, Z_sq],
-                           [Z_sq, Y_2, Y_2, Z_sq],
-                           [Y_2, Z_sq, Z_sq, Y_2]])
-
-    Hsystem_and_bath = Hsb_1 + Hsb_2
+    Hsystem_and_bath = lam * np.block([[Z, x, x, Z],
+                                       [x, Z, Z, x],
+                                       [x, Z, Z, x],
+                                       [Z, x, x, Z]])
 
     Htotal = Hsystem + Hbath + Hsystem_and_bath
 
@@ -82,37 +53,31 @@ def entagl(Jhat, ebs, lam1, lam2, omega_1, omega_2):
 
 
 def coeff_of_eigen_vectors(eigen_values, eigen_vectors, time):
-    coeffs = np.zeros((4 * n_sq, 1), dtype=complex)
-    # print(f"shape of eigen values: {eigen_values.shape}")
-    # print(f"shape of eigen vectors: {eigen_vectors.shape}")
-    for i in range(0, 4 * n_sq):
+    coeffs = np.zeros((4 * n, 1), dtype=complex)
+    for i in range(0, 4 * n):
         initial_coeff = np.dot(np.conj(eigen_vectors[:, i]), Initial_state)
-        # print(f"Shape of initial_coeff: {initial_coeff.shape}")
-        # print(f"Shape of eigen_values[i]: {eigen_values[i].shape}")
         coeffs[i] = initial_coeff * np.exp(-1j * eigen_values[i] * time)
-        # if np.round(coeffs[i], 6) != 0:
-        #     print(coeffs[i])
+
     return coeffs
 
 
 def psi_t(eigen_vectors, coeffs_t):
-    psi_at_time_t = np.zeros((4 * n_sq, 1), dtype=complex)
+    psi_at_time_t = np.zeros((4 * n, 1), dtype=complex)
 
     for i in range(0, 4 * n):
-        psi_at_time_t = psi_at_time_t + coeffs_t[i] * eigen_vectors[:, i].reshape((4 * n_sq, 1))
+        psi_at_time_t = psi_at_time_t + coeffs_t[i] * eigen_vectors[:, i].reshape((4 * n, 1))
 
     return psi_at_time_t
 
 
 def density_matrix_construction_at_time_t(psi_at_time_t):
-    d_matrix_at_time_t = psi_at_time_t @ np.conj(np.transpose(psi_at_time_t))
-    return d_matrix_at_time_t
+    return psi_at_time_t @ np.conj(np.transpose(psi_at_time_t))
 
 
 def partial_trace_over_bath_at_time_t(d_matrix_at_time_t):
     projections = []
-    Z = np.zeros((n_sq, n_sq))
-    I = np.eye(n_sq)
+    Z = np.zeros((n, n))
+    I = np.eye(n)
 
     pt_rd = np.zeros((4, 4), dtype=complex)
 
@@ -162,12 +127,9 @@ def reduced_density_matrix_over_1_qubit(rd_matrix_):
     return partial_reduced_density_matrix_over_single_qubit
 
 
-def process_lambda(J, ebs, lam1, lam2, omega_1, omega_2, time_step, end_time, folder_path):
+def process_lambda(J, ebs, lam, time_step, end_time, folder_path):
     legend_handles = []
-
-    # Call entagl with lam1 and lam2
-    eigen_values, eigen_vectors = entagl(J, ebs, lam1, lam2, omega_1, omega_2)
-
+    eigen_values, eigen_vectors = entagl(J, ebs, lam)
     trace_of_entropy_matrix = []
     time_vector = []
 
@@ -185,16 +147,22 @@ def process_lambda(J, ebs, lam1, lam2, omega_1, omega_2, time_step, end_time, fo
 
         trace_of_entropy_matrix.append(np.round(abs(val), 6))
 
+    # Plot and save graph for the current lambda
     plt.figure()
 
     line, = plt.plot(time_vector, trace_of_entropy_matrix)
     legend_handles.append(Line2D([0], [0], color=line.get_color(), lw=3))
-
+    # plt.plot(time_vector, trace_of_entropy_matrix)
+    # plt.ylim(None, 1)
     plt.ylim(None, 1)
     plt.legend(handles=legend_handles, loc='upper left', frameon=False, handlelength=3, handletextpad=1,
                labelspacing=1.5)
+    # plt.title(f'Entropy varying with time for λ={lam}')
+    # plt.xlabel('Time')
+    # plt.ylabel('Entropy')
 
-    file_name = f'lambda1_{lam1}_lambda2_{lam2}.png'
+    # Save the figure
+    file_name = f'lambda_{lam}.png'
     file_path = os.path.join(folder_path, file_name)
     plt.savefig(file_path)
     plt.close()
@@ -202,13 +170,13 @@ def process_lambda(J, ebs, lam1, lam2, omega_1, omega_2, time_step, end_time, fo
     return trace_of_entropy_matrix
 
 
-def varying_lam_values_parallel(J, ebs, lam1_vector, lam2_vector, omega_1, omega_2, time_step, end_time, folder_path):
+def varying_lam_values_parallel(J, ebs, lam_vector, time_step, end_time, folder_path):
     trace_matrix = []
 
     # Parallel processing using ProcessPoolExecutor
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(process_lambda, J, ebs, lam1, lam2, omega_1, omega_2, time_step, end_time, folder_path)
-                   for lam1, lam2 in zip(lam1_vector, lam2_vector)]
+        futures = [executor.submit(process_lambda, J, ebs, lam, time_step, end_time, folder_path)
+                   for lam in lam_vector]
 
         # Collect results
         for future in futures:
@@ -219,18 +187,6 @@ def varying_lam_values_parallel(J, ebs, lam1_vector, lam2_vector, omega_1, omega
 
 if __name__ == '__main__':
     folder_path = r"D:\Physics\Graphs\varying Entropy\initial_state_not_entangled\convergence"
-
-    # Define different lambda vectors for bath 1 and bath 2
-    lam1_vector = [0.03]
-    lam2_vector = [0.1]
-    # eig_val, eig_vec = entagl(0.0, 0.0, lam1_vector, lam2_vector, 0.09, 0)
-    # coeff_of_eigen_vectors(eig_val, eig_vec, 0)
-    mat, st = varying_lam_values_parallel(0.0, 0.0, lam1_vector, lam2_vector, 0.09, 0.0, 20, 100, folder_path)
-
-    file_path = os.path.join(folder_path, 'mat20.npy')
+    mat, st = varying_lam_values_parallel(0.0, 0.0, [0.03], 20, 600, folder_path)
+    file_path = os.path.join(folder_path, 'mat100.npy')
     np.save(file_path, mat)
-
-
-
-
-
